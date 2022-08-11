@@ -26,7 +26,7 @@ class CustomWansbCallBack(WandbCallback):
                 model_config = model.config.to_dict()
                 combined_dict = {**model_config, **combined_dict}
 
-            init_args = os.getenv("WANDB_INIT", {})
+            init_args: dict = self.__get_init_argument()
             trial_name = state.trial_name  # hyperparameter_searching을 진행할 떄 사용한다.
             if trial_name is not None:
                 run_name = trial_name
@@ -41,7 +41,7 @@ class CustomWansbCallBack(WandbCallback):
                     **init_args,
                 )
                 code_dir = os.getenv("CODE_DIR", None)
-                if code_dir and self._wandb.settings.save_code:
+                if code_dir and os.path.isdir(code_dir):
                     self._wandb.log_code(code_dir)
                 # inti은 wandb처음 시작할 때 사용하는 것이기 때문에 일부러 if문을 사용함.
             # add config parameters (run may have been created manually)
@@ -60,6 +60,27 @@ class CustomWansbCallBack(WandbCallback):
                     log=os.getenv("WANDB_WATCH", "gradients"),
                     log_freq=max(100, args.logging_steps),
                 )
+
+    def __get_init_argument(self) -> dict:
+        init_args = dict()
+
+        init_args["entity"]: Optional[str] = os.getenv("INIT_ENTITY", None)
+        init_args["reinit"]: bool = os.getenv("INIT_REINIT", None)
+        init_args["tags"]: Optional["sequence"] = os.getenv("INIT_", None)
+        init_args["group"]: Optional[str] = os.getenv("INIT_GROUPS", None)
+        init_args["notes"]: Optional[str] = os.getenv("INIT_NOTES", None)
+        init_args["magic"]: Union[dict, str, bool] = os.getenv("INIT_MAGICS", None)
+        init_args["anonymous"]: Optional[str] = os.getenv("INIT_", None)
+        init_args["mode"]: Optional[str] = os.getenv("INIT_", None)
+        init_args["resume"]: Optional[Union[bool, str]] = os.getenv("INIT_RESUME", None)
+        init_args["force"]: Optional[bool] = os.getenv("INIT_FORCE", None)
+        init_args["sync_tensorboard"] = os.getenv("INIT_TENSORBOARD", None)
+        init_args["monitor_gym"]: bool = True if os.getenv("INIT_MONITORGYM", None) == "true" else False
+        init_args["save_code"]: bool = True if os.getenv("INIT_SAVECODE", None) == "true" else False
+        init_args["id"]: str = os.getenv("INIT_ID", None)
+        init_args["settings"]: Union["settings", Dict[str, any], None] = os.getenv("INIT_SETTINGS", None)
+
+        return init_args
 
 def load_project_files(dir_path:os.PathLike) -> List[os.PathLike]:
     """
@@ -85,44 +106,3 @@ def code_upload_wandb(dir_path: os.PathLike, run) -> None:
 
     for file_path in tqdm(project_files):
         run.upload_file(file_path)
-
-def get_init_argument() -> dict:
-    init_args = dict()
-
-    init_args["entity"]: Optional[str] = os.getenv("INIT_ENTITY", None)
-    init_args["reinit"]: bool = os.getenv("INIT_REINIT", None)
-    init_args["tags"]: Optional["sequence"] = os.getenv("INIT_", None)
-    init_args["group"]: Optional[str] = os.getenv("INIT_GROUPS", None)
-    init_args["notes"]: Optional[str] = os.getenv("INIT_NOTES", None)
-    init_args["magic"]: Union[dict, str, bool] = os.getenv("INIT_MAGICS", None)
-    init_args["anonymous"]: Optional[str] = os.getenv("INIT_", None)
-    init_args["mode"]: Optional[str] = os.getenv("INIT_", None)
-    init_args["resume"]: Optional[Union[bool, str]] = os.getenv("INIT_RESUME", None)
-    init_args["force"]: Optional[bool] = os.getenv("INIT_FORCE", None)
-    init_args["sync_tensorboard"] = os.getenv("INIT_TENSORBOARD", None)
-    init_args["monitor_gym"]: bool = True if os.getenv("INIT_MONITORGYM", None) == "true" else False
-    init_args["save_code"]: bool = True if os.getenv("INIT_SAVECODE", None) == "true" else False
-    init_args["id"]: str = os.getenv("INIT_ID", None)
-    init_args["settings"]: Union["settings", Dict[str, any], None] = os.getenv("INIT_SETTINGS", None)
-
-    return init_args
-
-def main():
-    init_args: dict = get_init_argument()
-
-    run = wandb.init(
-            project=os.getenv("WANDB_PROJECT", "huggingface"),
-            name="test_for_save_code",
-            **init_args,
-            )
-
-    code_dir = os.getenv("CODE_DIR", None)
-    print(f"save_dir_is: {code_dir}")
-    if code_dir:
-        run.log_code(code_dir)
-    return True
-
-if "__main__" == __name__:
-    os.environ["CODE_DIR"] = r"/home/jsb193/workspace/github/stt/tadev-STT"
-    os.environ["INIT_SAVECODE"] = "true"
-    main()
