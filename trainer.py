@@ -1,5 +1,4 @@
-from transformers import Trainer, BertForSequenceClassification
-from kobert_tokenizer import KoBertTokenizer
+from transformers import Trainer
 import torch
 import wandb
 from typing import Dict, Union, Any
@@ -74,7 +73,7 @@ class CustomTrainer(Trainer):
                     attention_first_head.cpu(),
                     show_text=False,
                 )
-                
+
                 wandb.log({f"attention_heatmap_{self.state.global_step}": heatmap})
 
         if self.args.n_gpu > 1:
