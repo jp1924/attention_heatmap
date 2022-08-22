@@ -41,7 +41,7 @@ def main(args: CustomTrainingArguments) -> None:
         predictions = predictions.argmax(-1)
         references = outputs.label_ids
         result = accuracy._compute(predictions, references, normalize=True)
-        return {"Accuracy": result}
+        return result
 
     trainer = CustomTrainer(
         model=model,
