@@ -14,7 +14,7 @@ class BertCollator:
         batch = self.tokenizer.pad(encoded_inputs=input_ids, padding=True, return_attention_mask=True, return_tensors="pt")
 
         label = [feature["label"] for feature in features]
-        batch["labels"] = torch.tensor(label).to(torch.float32)
+        batch["labels"] = torch.tensor(label).to(torch.long)
         batch["output_attentions"] = True
 
         return batch
