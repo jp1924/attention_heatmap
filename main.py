@@ -18,7 +18,7 @@ def main(args: CustomTrainingArguments) -> None:
     NSMC_datasets = datasets.load_dataset("nsmc", cache_dir=args.cache_dir)
     bert_tokenizer = KoBertTokenizer.from_pretrained("monologg/kobert", cache_dir=args.cache_dir)
 
-    config = BertConfig(vocab_size=bert_tokenizer.vocab_size, num_labels=1)
+    config = BertConfig(vocab_size=bert_tokenizer.vocab_size, num_labels=2)
     model = BertForSequenceClassification.from_pretrained("monologg/kobert", cache_dir=args.cache_dir, config=config)
     model = model.to("cpu")
 
@@ -38,8 +38,9 @@ def main(args: CustomTrainingArguments) -> None:
 
     def metrics(outputs: Dict[str, Union[List[int], torch.Tensor]]) -> Dict[str, int]:
         predictions = outputs.predictions
+        predictions = predictions.argmax(-1)
         references = outputs.label_ids
-        result = accuracy._compute(predictions, references, normalize=False)
+        result = accuracy._compute(predictions, references, normalize=True)
         return {"Accuracy": result}
 
     trainer = CustomTrainer(
@@ -53,13 +54,13 @@ def main(args: CustomTrainingArguments) -> None:
         tokenizer=bert_tokenizer,
     )
 
-    trainer.train()
+    trainer.train(ignore_keys_for_eval=["attentions"])
 
 
 if "__main__" == __name__:
     os.environ["WANDB_PROJECT"] = "[study]attention_machanism"
     os.environ["CODE_DIR"] = r"/home/jsb193/workspace/[study]Attention/Attention_Mechanism"
-    os.environ["WANDB_DISABLED"] = "false"
+    # os.environ["WANDB_DISABLED"] = "false"
     setproctitle("[JP]test")
 
     parser = HfArgumentParser(CustomTrainingArguments)
