@@ -4,6 +4,7 @@ import wandb
 from typing import Dict, Union, Any
 import torch.nn as nn
 from transformers.utils import is_sagemaker_mp_enabled, is_apex_available
+import os
 
 if is_sagemaker_mp_enabled():
     import smdistributed.modelparallel.torch as smp
@@ -43,7 +44,7 @@ class CustomTrainer(Trainer):
         with self.compute_loss_context_manager():
             loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
 
-        if (self.state.global_step % 100 == 0) and self.state.is_world_process_zero:
+        if (self.state.global_step % self.args.eval_steps == 0) and (self.state.is_world_process_zero and os.getenv("WANDB_DISABLED") != "true"):
             with torch.no_grad():
                 label_sentence = "발연기 도저히 못보겠다 진짜 이렇게 연기를 못할거라곤 상상도 못했네"
                 cls_token = self.tokenizer._cls_token
