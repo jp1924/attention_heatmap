@@ -3,13 +3,13 @@ from typing import Dict, List, Union
 
 import datasets
 import torch
+from collator import BertCollator
 from setproctitle import setproctitle
+from trainer import CustomTrainer
 from transformers import BatchEncoding, BertConfig, BertForSequenceClassification, HfArgumentParser
 from transformers.integrations import WandbCallback
 
-from argument import CustomTrainingArguments
-from collator import BertCollator
-from trainer import CustomTrainer
+from utils import BertDataArguments, BertModelArguments, BertTrainingArguments
 
 
 def main(parser: HfArgumentParser) -> None:
