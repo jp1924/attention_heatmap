@@ -25,45 +25,54 @@ def main(parser: HfArgumentParser) -> None:
     train_args, model_args, _ = parser.parse_args_into_dataclasses(return_remaining_strings=True)
     setproctitle(train_args.run_name)  # [TODO]: trainginarguemnt의 run_name으로 변경
 
-    def metrics(outputs: Dict[str, Union[List[int], torch.Tensor]]) -> Dict[str, int]:
-        """_summary_
+    def metrics(input_values: Dict[str, Union[List[int], torch.Tensor]]) -> Dict[str, int]:
+        """__metrics__ evaluation때 모델의 성능을 검증하기 위한 함수
+            trainer의 evaluation_loop시 모델의 성능을 검증하기 위해
+            valid데이터의 logits을 전달받아 각종 evaluate의 metric을
+            적용시키는 함수 입니다.
 
         Args:
-            outputs (Dict[str, Union[List[int], torch.Tensor]]): _description_
+            input_values (Dict[str, Union[List[int], torch.Tensor]]): evaluation_loop를 거친 logits값을 전달받습니다.
 
         Returns:
-            Dict[str, int]: _description_
+            Dict[str, int]: metrics결과를 끝낸 값을 dict에 넣어 반환합니다.
         """
-        predictions = outputs.predictions
+        predictions = input_values.predictions
         predictions = predictions.argmax(-1)
-        references = outputs.label_ids
+        references = input_values.label_ids
         result = accuracy._compute(predictions, references, normalize=True)
         return result
 
-    def preprocess(input_data: datasets.Dataset) -> BatchEncoding:
-        """_summary_
+    def preprocess(input_data: datasets.Dataset) -> dict:
+        """__preprocess__: 각 데이터를 토크나이징 및 별도의 전처리를 적용시키는 함수
+
+        각 데이터의 전처리르 위한 함수 입니다. 이 함수는 datasets으로 부터
+        dict형태의 각 데이터를 입력받아 tokenizer로 인코딩 후 dict형식으로 반환합니다.
 
         Args:
-            input_data (datasets.Dataset): _description_
+            input_data (datasets.Dataset): Datasets로 부터 건내받은 dict형식의 각 데이터를 전달 받습니다.
 
         Returns:
-            BatchEncoding: _description_
+            BatchEncoding: Datasets의 각 열의 해당되는 columns를 가지고 전처리 된 데이터를 반환합니다.
         """
         input_text = input_data["document"]
         output_data = tokenizer(input_text, return_attention_mask=False)
         output_data["label"] = input_data["label"]
         return output_data
 
+    # [NOTE]:
     tokenizer = BertTokenizerFast.from_pretrained(model_args.model_name, cache_dir=train_args.cache)
     config = BertConfig(vocab_size=tokenizer.vocab_size, num_labels=model_args.num_labels)
     model = BertForSequenceClassification.from_pretrained(
         model_args.model_name, cache_dir=train_args.cache, config=config
     )
 
+    # [NOTE]:
     NSMC_datasets = datasets.load_dataset("nsmc", cache_dir=train_args.cache)
     NSMC_train = NSMC_datasets["train"].map(preprocess, num_proc=train_args.num_proc)
     NSMC_valid = NSMC_datasets["test"].map(preprocess, num_proc=train_args.num_proc)
 
+    # [NOTE]:
     accuracy = load("accuracy")
     callback_func = [WandbCallback] if os.getenv("WANDB_DISABLED") != "true" else None
     collator = BertHeatmapCollator(tokenizer)
@@ -78,7 +87,7 @@ def main(parser: HfArgumentParser) -> None:
         callbacks=callback_func,
         tokenizer=tokenizer,
     )
-    # do train, do eval, do predict으로 변경
+    # [NOTE]:
     trainer.train(ignore_keys_for_eval=["attentions"])
     if train_args.do_train:
         train(trainer, train_args)
