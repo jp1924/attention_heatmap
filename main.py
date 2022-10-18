@@ -7,7 +7,6 @@ import torch
 from evaluate import load
 from setproctitle import setproctitle
 from transformers import (
-    BatchEncoding,
     BertConfig,
     BertForSequenceClassification,
     BertTokenizerFast,
@@ -23,10 +22,10 @@ from utils import BertModelArguments, BertTrainingArguments
 
 def main(parser: HfArgumentParser) -> None:
     train_args, model_args, _ = parser.parse_args_into_dataclasses(return_remaining_strings=True)
-    setproctitle(train_args.run_name)  # [TODO]: trainginarguemnt의 run_name으로 변경
+    setproctitle(train_args.run_name)
 
     def metrics(input_values: Dict[str, Union[List[int], torch.Tensor]]) -> Dict[str, int]:
-        """__metrics__ evaluation때 모델의 성능을 검증하기 위한 함수
+        """evaluation때 모델의 성능을 검증하기 위한 함수
             trainer의 evaluation_loop시 모델의 성능을 검증하기 위해
             valid데이터의 logits을 전달받아 각종 evaluate의 metric을
             적용시키는 함수 입니다.
@@ -44,7 +43,7 @@ def main(parser: HfArgumentParser) -> None:
         return result
 
     def preprocess(input_data: datasets.Dataset) -> dict:
-        """__preprocess__: 각 데이터를 토크나이징 및 별도의 전처리를 적용시키는 함수
+        """각 데이터를 토크나이징 및 별도의 전처리를 적용시키는 함수
 
         각 데이터의 전처리르 위한 함수 입니다. 이 함수는 datasets으로 부터
         dict형태의 각 데이터를 입력받아 tokenizer로 인코딩 후 dict형식으로 반환합니다.
@@ -60,19 +59,19 @@ def main(parser: HfArgumentParser) -> None:
         output_data["label"] = input_data["label"]
         return output_data
 
-    # [NOTE]:
+    # [NOTE]: load bert model, tokenizer, config
     tokenizer = BertTokenizerFast.from_pretrained(model_args.model_name, cache_dir=train_args.cache)
     config = BertConfig(vocab_size=tokenizer.vocab_size, num_labels=model_args.num_labels)
     model = BertForSequenceClassification.from_pretrained(
         model_args.model_name, cache_dir=train_args.cache, config=config
     )
 
-    # [NOTE]:
+    # [NOTE]: load Naver Setimant Movie Corpus datasets
     NSMC_datasets = datasets.load_dataset("nsmc", cache_dir=train_args.cache)
     NSMC_train = NSMC_datasets["train"].map(preprocess, num_proc=train_args.num_proc)
     NSMC_valid = NSMC_datasets["test"].map(preprocess, num_proc=train_args.num_proc)
 
-    # [NOTE]:
+    # [NOTE]: Setting for Trainer
     accuracy = load("accuracy")
     callback_func = [WandbCallback] if os.getenv("WANDB_DISABLED") != "true" else None
     collator = BertHeatmapCollator(tokenizer)
@@ -87,8 +86,8 @@ def main(parser: HfArgumentParser) -> None:
         callbacks=callback_func,
         tokenizer=tokenizer,
     )
-    # [NOTE]:
-    trainer.train(ignore_keys_for_eval=["attentions"])
+
+    # [NOTE]: running train, eval, predict
     if train_args.do_train:
         train(trainer, train_args)
     if train_args.do_eval:
@@ -98,37 +97,42 @@ def main(parser: HfArgumentParser) -> None:
 
 
 def train(trainer: Trainer, args: Namespace) -> None:
-    """_summary_
+    """모델을 학습시키기 위한 함수 입니다.
+
+    train_data에 맞춰 모델을 학습시킵니다.
+    huggingface의 TrainingArgument에 있는 resume_from_checkpoint에 값을
+    os.PathLike혹은 Bool 자료형을 들을 건내줄 수 있습니다.
+        - os.PathLike: 해당 경로에 지정된 checkpoint 부터 trainer가 시작됩니다.
+        - Bool: output_dir에 있는 마지막 checkpoint를 불러옵니다.
 
     Args:
-        trainer (Trainer): _description_
-        args (Namespace): _description_
+        trainer (Trainer): trainer를 건내받습니다.
+        args (Namespace): trainer에 들어가는 train_argument를 건내받습니다.
     """
-    trainer
+    trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
 
 
-def eval(trainer: Trainer, valid_data: datasets.Dataset) -> None:
-    """_summary_
+def eval(trainer: Trainer, eval_data: datasets.Dataset) -> None:
+    """학습이 끝난 이후 모델의 성능을 검증하기 위한 함수 입니다.
 
     Args:
-        trainer (Trainer): _description_
-        valid_data (datasets.Dataset): _description_
+        trainer (Trainer): trainer를 건내받습니다.
+        eval_data (datasets.Dataset): 검증에 사용할 데이터를 건내받습니다.
     """
-    trainer
+    trainer.evaluate(eval_dataset=eval_data)
 
 
 def predict(trainer: Trainer, test_data: datasets.Dataset) -> None:
-    """_summary_
+    """학습이 끝난 이후 모델을 실제 데이터에 테스트 하는 함수 입니다.
 
     Args:
-        trainer (Trainer): _description_
-        test_data (datasets.Dataset): _description_
+        trainer (Trainer): tainer를 건내받습니다.
+        test_data (datasets.Dataset): 예측에 사용될 데이터를 건내받습니다.
     """
-    trainer
+    trainer.predict(test_dataset=test_data)
 
 
 if "__main__" == __name__:
-    # [TODO]: 경로 관련 설정 삭제, 환경 변수 launch.json, shell script로 변경
     parser = HfArgumentParser(BertTrainingArguments, BertModelArguments)
 
     main(parser)
