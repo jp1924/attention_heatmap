@@ -1,1 +1,1 @@
-from .arguments import BertDataArguments, BertModelArguments, BertTrainingArguments
+from .arguments import BertModelArguments, BertTrainingArguments
