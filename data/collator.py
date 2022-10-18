@@ -1,14 +1,21 @@
 from typing import Dict, List, Union
-import transformers
+from transformers import PreTrainedTokenizer
 import torch
-from attention_heatmap.kobert import KoBertTokenizer
 
 
-class BertCollator:
-    def __init__(self, tokenizer: KoBertTokenizer) -> None:
+class BertHeatmapCollator:
+    def __init__(self, tokenizer: PreTrainedTokenizer) -> None:
         self.tokenizer = tokenizer
 
     def __call__(self, features: List[Dict[str, Union[List[int], torch.Tensor]]]) -> Dict[str, torch.Tensor]:
+        """_summary_
+
+        Args:
+            features (List[Dict[str, Union[List[int], torch.Tensor]]]): _description_
+
+        Returns:
+            Dict[str, torch.Tensor]: _description_
+        """
         batch = dict()
         input_ids = [{"input_ids": feature["input_ids"]} for feature in features]
         batch = self.tokenizer.pad(
