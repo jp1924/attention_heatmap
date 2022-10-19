@@ -67,9 +67,9 @@ def main(parser: HfArgumentParser) -> None:
     )
 
     # [NOTE]: load Naver Setimant Movie Corpus datasets
-    NSMC_datasets = datasets.load_dataset("nsmc", cache_dir=train_args.cache)
-    NSMC_train = NSMC_datasets["train"].map(preprocess, num_proc=train_args.num_proc)
-    NSMC_valid = NSMC_datasets["test"].map(preprocess, num_proc=train_args.num_proc)
+    loaded_data = datasets.load_dataset("nsmc", cache_dir=train_args.cache)
+    train_data = loaded_data["train"].map(preprocess, num_proc=train_args.num_proc)
+    valid_data = loaded_data["test"].map(preprocess, num_proc=train_args.num_proc)
 
     # [NOTE]: Setting for Trainer
     accuracy = load("accuracy")
@@ -80,8 +80,8 @@ def main(parser: HfArgumentParser) -> None:
         model=model,
         args=train_args,
         compute_metrics=metrics,
-        train_dataset=NSMC_train,
-        eval_dataset=NSMC_valid,
+        train_dataset=train_data,
+        eval_dataset=valid_data,
         data_collator=collator,
         callbacks=callback_func,
         tokenizer=tokenizer,
@@ -91,9 +91,9 @@ def main(parser: HfArgumentParser) -> None:
     if train_args.do_train:
         train(trainer, train_args)
     if train_args.do_eval:
-        eval(trainer, NSMC_valid)
+        eval(trainer, valid_data)
     if train_args.do_predict:
-        predict(trainer, NSMC_valid)
+        predict(trainer, valid_data)
 
 
 def train(trainer: Trainer, args: Namespace) -> None:
@@ -110,6 +110,7 @@ def train(trainer: Trainer, args: Namespace) -> None:
         args (Namespace): trainer에 들어가는 train_argument를 건내받습니다.
     """
     trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
+    trainer.save_model(args.output_dir)
 
 
 def eval(trainer: Trainer, eval_data: datasets.Dataset) -> None:
