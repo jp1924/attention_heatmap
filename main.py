@@ -1,3 +1,4 @@
+import json
 import os
 from argparse import Namespace
 from typing import Dict, List, Union
@@ -11,6 +12,7 @@ from transformers import (
     BertForSequenceClassification,
     BertTokenizerFast,
     HfArgumentParser,
+    PreTrainedModel,
     Trainer,
 )
 from transformers.integrations import WandbCallback
@@ -59,11 +61,32 @@ def main(parser: HfArgumentParser) -> None:
         output_data["label"] = input_data["label"]
         return output_data
 
+    def model_init(trial: dict) -> PreTrainedModel:
+        """hyperparameter_search를 할 때 사용하는 함수
+            model_init은 hyperparameter_search를 trial이 건내준
+            config에 맞춰 model을 초기화 시켜주는 함수 입니다.
+
+        Args:
+            trial (dict): model과 관련된 각종 설정값을 건내받습니다.
+
+        Returns:
+            PreTrainedModel: 초기화가 끝난 모델을 반환합니다.
+        """
+        trial_config = BertConfig(vocab_size=tokenizer.vocab_size, num_labels=model_args.num_labels, **trial)
+        trial_model = BertForSequenceClassification.from_pretrained(
+            model_args.model_name,
+            cache_dir=train_args.cache,
+            config=trial_config,
+        )
+        return trial_model
+
     # [NOTE]: load bert model, tokenizer, config
     tokenizer = BertTokenizerFast.from_pretrained(model_args.model_name, cache_dir=train_args.cache)
     config = BertConfig(vocab_size=tokenizer.vocab_size, num_labels=model_args.num_labels)
     model = BertForSequenceClassification.from_pretrained(
-        model_args.model_name, cache_dir=train_args.cache, config=config
+        model_args.model_name,
+        cache_dir=train_args.cache,
+        config=config,
     )
 
     # [NOTE]: load Naver Setimant Movie Corpus datasets
@@ -76,9 +99,14 @@ def main(parser: HfArgumentParser) -> None:
     callback_func = [WandbCallback] if os.getenv("WANDB_DISABLED") != "true" else None
     collator = BertHeatmapCollator(tokenizer)
 
+    # [NOTE]: set hyperparameter if hyperparameter_search is True
+    model = None if train_args.hyperparameter_search else model
+    model_initer = model_init if train_args.hyperparameter_search else None
+
     trainer = HeatmapTrainer(
         model=model,
         args=train_args,
+        model_init=model_initer,
         compute_metrics=metrics,
         train_dataset=train_data,
         eval_dataset=valid_data,
@@ -88,6 +116,8 @@ def main(parser: HfArgumentParser) -> None:
     )
 
     # [NOTE]: running train, eval, predict
+    if train_args.hyperparameter_search:
+        hyperparameter_search(trainer, train_args)
     if train_args.do_train:
         train(trainer, train_args)
     if train_args.do_eval:
@@ -131,6 +161,19 @@ def predict(trainer: Trainer, test_data: datasets.Dataset) -> None:
         test_data (datasets.Dataset): 예측에 사용될 데이터를 건내받습니다.
     """
     trainer.predict(test_dataset=test_data)
+
+
+def hyperparameter_search(trainer: Trainer, args: Namespace) -> None:
+    def hp_space_config(trial):
+        return json.load(args.hp_config)
+
+    trainer.hyperparameter_search(
+        hp_space=hp_space_config,
+        n_trials=args.hp_trial,
+        direction=args.hp_direction,
+        backend=args.hp_backend,
+    )
+    None
 
 
 if "__main__" == __name__:
