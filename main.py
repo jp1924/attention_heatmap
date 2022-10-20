@@ -1,7 +1,7 @@
 import json
 import os
 from argparse import Namespace
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Union
 
 import datasets
 import torch
@@ -72,7 +72,13 @@ def main(parser: HfArgumentParser) -> None:
         Returns:
             PreTrainedModel: 초기화가 끝난 모델을 반환합니다.
         """
-        trial_config = BertConfig(vocab_size=tokenizer.vocab_size, num_labels=model_args.num_labels, **trial)
+        trial_config = BertConfig.from_pretrained(
+            model_args.model_name,
+            vocab_size=tokenizer.vocab_size,
+            num_label=model_args.num_labels,
+            cache_dir=train_args.cache,
+            **trial,
+        )
         trial_model = BertForSequenceClassification.from_pretrained(
             model_args.model_name,
             cache_dir=train_args.cache,
@@ -82,7 +88,12 @@ def main(parser: HfArgumentParser) -> None:
 
     # [NOTE]: load bert model, tokenizer, config
     tokenizer = BertTokenizerFast.from_pretrained(model_args.model_name, cache_dir=train_args.cache)
-    config = BertConfig(vocab_size=tokenizer.vocab_size, num_labels=model_args.num_labels)
+    config = BertConfig.from_pretrained(
+        model_args.model_name,
+        vocab_size=tokenizer.vocab_size,
+        num_label=model_args.num_labels,
+        cache_dir=train_args.cache,
+    )
     model = BertForSequenceClassification.from_pretrained(
         model_args.model_name,
         cache_dir=train_args.cache,
@@ -164,8 +175,9 @@ def predict(trainer: Trainer, test_data: datasets.Dataset) -> None:
 
 
 def hyperparameter_search(trainer: Trainer, args: Namespace) -> None:
-    def hp_space_config(trial):
-        return json.load(args.hp_config)
+    def hp_space_config(_) -> Dict[str, Any]:
+        with open(args.hp_config, "r", encoding="utf-8") as jf:
+            return json.load(jf)
 
     trainer.hyperparameter_search(
         hp_space=hp_space_config,
@@ -173,7 +185,6 @@ def hyperparameter_search(trainer: Trainer, args: Namespace) -> None:
         direction=args.hp_direction,
         backend=args.hp_backend,
     )
-    None
 
 
 if "__main__" == __name__:
