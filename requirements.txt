@@ -3,6 +3,7 @@ datasets==2.6.1
 evaluate==0.3.0
 wandb==0.13.4
 setproctitle
+sklearn
 wheel
 black
 flake8
