@@ -4,8 +4,9 @@ import torch
 
 
 class BertHeatmapCollator:
-    tokenizer: PreTrainedTokenizer
-    outputs_attentions: bool = False
+    def __init__(self, tokenizer: PreTrainedTokenizer) -> None:
+        self.tokenizer = tokenizer
+        self.outputs_attentions: bool = False
 
     def __call__(self, features: List[Dict[str, Union[List[int], torch.Tensor]]]) -> Dict[str, torch.Tensor]:
         """들어온 데이터의 길이를 일정하게 만드는 class 입니다.
