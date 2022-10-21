@@ -101,14 +101,18 @@ def main(parser: HfArgumentParser) -> None:
     )
 
     # [NOTE]: load Naver Setimant Movie Corpus datasets
+    check_train = train_args.do_train
+    check_valid = train_args.do_eval or train_args.do_predict
+
     loaded_data = datasets.load_dataset("nsmc", cache_dir=train_args.cache)
-    train_data = loaded_data["train"].map(preprocess, num_proc=train_args.num_proc)
-    valid_data = loaded_data["test"].map(preprocess, num_proc=train_args.num_proc)
+    train_data = loaded_data["train"].map(preprocess, num_proc=train_args.num_proc) if check_train else None
+    valid_data = loaded_data["test"].map(preprocess, num_proc=train_args.num_proc) if check_valid else None
 
     # [NOTE]: Setting for Trainer
-    accuracy = load("accuracy")
+    accuracy = load("accuracy", cache_dir=train_args.cache)
     callback_func = [WandbCallback] if os.getenv("WANDB_DISABLED") != "true" else None
-    collator = BertHeatmapCollator(tokenizer)
+    collator = BertHeatmapCollator
+    collator.tokenizer = tokenizer
 
     # [NOTE]: set hyperparameter if hyperparameter_search is True
     model = None if train_args.hyperparameter_search else model
@@ -188,6 +192,6 @@ def hyperparameter_search(trainer: Trainer, args: Namespace) -> None:
 
 
 if "__main__" == __name__:
-    parser = HfArgumentParser(BertTrainingArguments, BertModelArguments)
+    parser = HfArgumentParser([BertTrainingArguments, BertModelArguments])
 
     main(parser)
